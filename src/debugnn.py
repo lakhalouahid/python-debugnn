@@ -125,6 +125,7 @@ def run_poll(cmds: list, cwds: list, num_workers: int, sleep: float = 1, **args)
       ecmds += 1
     for proc in procs:
       if proc.poll() != None:
-        del fds[procs.index(proc)]
+        os.close(fds[procs.index(proc)])
+        fds.pop(procs.index(proc))
         procs.remove(proc)
     time.sleep(sleep)
