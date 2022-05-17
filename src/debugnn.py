@@ -86,7 +86,8 @@ def dict2cmd(jcfg, prefix="python"):
   cmds = []
   jcmds = []
   while ixs[-1] < shape[-1]:
-    cmd = "{} {} {}".format(prefix, jcfg['filename'], dargs)
+    executable_path = os.path.join(os.getcwd(), jcfg['filename'])
+    cmd = "{} {} {}".format(prefix, executable_path, dargs)
     jcmd = list(range(len(args)))
 
     for i in range(len(shape)):
