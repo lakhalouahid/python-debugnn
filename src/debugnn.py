@@ -43,6 +43,8 @@ def train(root_dir: str = "root"):
       else:
         jinfos[i]["end-time"] = time.strftime('%Y-%m-%dT%H:%M:%S')
         jinfos[i]["returncode"] = procs[i].poll()
+        with open(os.path.join(cwds[i], "training.json"), "wt") as fd:
+          json.dump(jinfos[i], fd)
 
     if all_terminated:
       break
