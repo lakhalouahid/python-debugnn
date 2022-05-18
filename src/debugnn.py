@@ -1,15 +1,20 @@
 import subprocess
+
 import json
 import time
 import copy
+import pyfzf
+import sys
 import os
+import re
 import random, string
 
-
+from typing import Optional
 
 def get_random_str(length: int = 32):
    letters = string.ascii_letters + string.digits
    return ''.join(random.choice(letters) for _ in range(length))
+
 
 def prepare_training(root_dir: str = "root"):
   jcfg = get_jcfg()
@@ -20,6 +25,7 @@ def prepare_training(root_dir: str = "root"):
     path = os.path.join(os.getcwd(), cwd)
     os.makedirs(path)
   return (jcfg, cmds, jinfos, cwds)
+
 
 def train(root_dir: str = "root"):
   jcfg, cmds, jinfos, cwds = prepare_training(root_dir)
@@ -131,3 +137,100 @@ def run_poll(cmds: list, cwds: list, num_workers: int, sleep: float = 1, **args)
         fds.pop(procs.index(proc))
         procs.remove(proc)
     time.sleep(sleep)
+
+def parse_jtraining(jpath: str):
+  fd = open(jpath, "r")
+  jdata = json.load(fd)
+  jinfo = {}
+  jinfo["args"] = {}
+  for arg in jdata["args"]:
+    jinfo["args"][arg["name"]] = arg["value"]
+
+  for k, v in parse_args(jdata["default-args"]).items():
+    try:
+      jinfo["args"][k] = float(v)
+    except ValueError:
+      jinfo["args"][k] = v
+  fd.close()
+  return jinfo
+
+
+def read_lastline(filepath):
+  with open(filepath, 'rb') as f:
+    try:
+      f.seek(-2, os.SEEK_END)
+      while f.read(1) != b'\n':
+        f.seek(-2, os.SEEK_CUR)
+    except OSError:
+      f.seek(0)
+    last_line = f.readline().decode()
+  return last_line
+
+
+def get_jtraining(dirpath: str, jtraining_filename="training.json"):
+  jtraining_filepath = os.path.join(dirpath, jtraining_filename)
+  return parse_jtraining(jtraining_filepath)
+
+def parse_args(args: str):
+  matches = re.findall(r'(?:--?)([\w-]+)(.*?)(?= -|$)', args)
+
+  result = {}
+  for m in matches:
+    result[m[0]] = True if not m[1] else m[1].strip()
+  return result
+
+
+def get_dirs(root_dir: str):
+  root_dir_abs = os.path.join(os.getcwd(), root_dir)
+  return [os.path.join(root_dir_abs, sub_dir) for sub_dir in os.listdir(root_dir_abs)]
+
+def format(args):
+  str_args = ''
+  for k,v in args["args"].items():
+    str_args += "{}: {}, ".format(k, v)
+  return str_args
+
+def pretty_json(jdict):
+  return json.dumps(jdict, indent=4)
+
+def get_cmd_from_script(script, exe: str="python", extra: str=""):
+  cwd = os.getcwd()
+  script_abs_path = os.path.join(cwd, script)
+  cmd = "{} {} {}".format(exe, script_abs_path, extra)
+  return cmd
+
+def loop_script(script_rpath: str, root_dir: str="root", extra: str="", exe: str="python"):
+  fzf = pyfzf.FzfPrompt("/usr/bin/fzf")
+  sub_dirs = get_dirs(root_dir)
+  sub_jinfos = [get_jtraining(sub_dir) for sub_dir in sub_dirs]
+  train_files = [os.path.join(sub_dir, "logs/train.log") for sub_dir in sub_dirs]
+  for i in range(len(sub_dirs)):
+    sub_jinfos[i]["args"]["log"] = float(read_lastline(train_files[i]).split(",")[0])
+
+  sub_str_jinfos = [format(sub_jinfo) for sub_jinfo in sub_jinfos]
+  dir_index = 0
+  proc = None
+  while True:
+    uinput = input("Enter command (q/n/p/s/i/r): ")
+    if uinput == "q":
+      if proc != None:
+        proc.terminate()
+      break
+    elif uinput == "n":
+      dir_index += 1
+    elif uinput == "p":
+      dir_index -= 1
+    elif uinput == "r":
+      pass
+    elif uinput == "s":
+      selected_args_list = fzf.prompt(sub_str_jinfos)
+      for selected_args in selected_args_list:
+        dir_index = sub_str_jinfos.index(selected_args)
+    elif uinput == "i":
+      print(pretty_json(sub_jinfos[dir_index]["args"]))
+      continue
+    print(pretty_json(sub_jinfos[dir_index]["args"]))
+    if proc != None:
+      proc.terminate()
+    proc = subprocess.Popen(get_cmd_from_script(script_rpath, exe=exe, extra=extra), cwd=sub_dirs[dir_index], shell=True, stdin=sys.stdin)
+    proc.wait()
