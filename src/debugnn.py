@@ -16,8 +16,9 @@ def get_random_str(length: int = 32):
    return ''.join(random.choice(letters) for _ in range(length))
 
 
-def prepare_training(root_dir: str = "root"):
+def prepare_training(config_path):
   jcfg = get_jcfg()
+  root_dir = jcfg["root"]
   cmds, jcmds = dict2cmd(jcfg)
   jinfos = instances_info(jcfg, jcmds)
   cwds = get_wds(len(cmds), root_dir)
@@ -28,8 +29,8 @@ def prepare_training(root_dir: str = "root"):
   return (jcfg, cmds, jinfos, cwds)
 
 
-def train(root_dir: str = "root"):
-  jcfg, cmds, jinfos, cwds = prepare_training(root_dir)
+def train(config_path: str = "debugnn_config.json"):
+  jcfg, cmds, jinfos, cwds = prepare_training(config_path)
   num_workers = jcfg["num_workers"]
   poll = run_poll(cmds, cwds, num_workers, shell=True)
   pstatus = [None for _ in range(len(cmds))]
