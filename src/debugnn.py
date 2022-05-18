@@ -23,7 +23,7 @@ def prepare_training(root_dir: str = "root"):
   cwds = get_wds(len(cmds), root_dir)
   for cwd in cwds:
     path = os.path.join(os.getcwd(), cwd)
-    if os.path.exists(path):
+    if not os.path.exists(path):
       os.makedirs(path)
   return (jcfg, cmds, jinfos, cwds)
 
@@ -128,7 +128,7 @@ def run_poll(cmds: list, cwds: list, num_workers: int, sleep: float = 1, **args)
   while ecmds < len(cmds) or len(procs) > 0:
     if len(procs) < num_workers and ecmds < len(cmds):
       fds.append(open(os.path.join(cwds[ecmds], "stdout.txt"), "w+"))
-      proc = subprocess.Popen(cmds[ecmds], cwd=cwds[ecmds], stderr=subprocess.DEVNULL, **args)
+      proc = subprocess.Popen(cmds[ecmds], cwd=cwds[ecmds], stdout=fds[-1], **args)
       yield proc
       procs.append(proc)
       ecmds += 1
