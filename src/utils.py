@@ -50,8 +50,11 @@ def read_lastline(filepath):
 def append_basename(sub_dirs: list[str], basename: str):
   return [os.path.join(sub_dir, basename) for sub_dir in sub_dirs]
 
-def prepend_prefix(sub_dirs: list[str], prefix: str):
-  return [os.path.join(prefix, sub_dir) for sub_dir in sub_dirs]
+def prepend_prefix(suffix_list: list[str], prefix: str):
+  return ["{} {}".format(prefix, suffix) for suffix in suffix_list]
+
+def prepend_dir(sub_dirs: list[str], dirname: str):
+  return [os.path.join(dirname, sub_dir) for sub_dir in sub_dirs]
 
 def get_subdirs(root: str):
   return prepend_prefix(os.listdir(root), root)
@@ -67,7 +70,7 @@ def gen_rawoptionslist(cfg):
       argname = arg["name"]
       argtype = arg["type"]
 
-      options = " --{}={}".format(argname, argval)
+      options = " --{} {}".format(argname, argval)
       if argtype == "bool" and argval:
         options = " --{}".format(args[i]['name'])
       cmd += options
