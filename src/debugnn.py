@@ -95,7 +95,7 @@ def run_scriptover(script: str, root: str="root", executable: str="python", opti
   sub_othercfgslist = othercfgsfunc(sub_dirs)
   n, idx, proc = len(sub_dirs), 0, None
   for i in range(n):
-    for k, v in sub_othercfgslist[i]:
+    for k, v in sub_othercfgslist[i].items():
       sub_cfgslist[i][k] = v
 
   sub_cfgsliststr = maplist(sub_cfgslist, dict_formatfzf)

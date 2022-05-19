@@ -28,7 +28,10 @@ def rawparse_args(rawoptions: str):
   matches = re.findall(r'(?:--?)([\w-]+)(.*?)(?= -|$)', rawoptions)
   result = {}
   for m in matches:
-    result[m[0]] = True if not m[1] else m[1].strip()
+    try:
+      result[m[0]] = True if not m[1] else float(m[1].strip())
+    except ValueError:
+      result[m[0]] = True if not m[1] else m[1].strip()
   return result
 
 def dict_pretty_print(_dict):
@@ -57,7 +60,7 @@ def prepend_dir(sub_dirs: list[str], dirname: str):
   return [os.path.join(dirname, sub_dir) for sub_dir in sub_dirs]
 
 def get_subdirs(root: str):
-  return prepend_prefix(os.listdir(root), root)
+  return prepend_dir(os.listdir(root), root)
 
 def gen_rawoptionslist(cfg):
   args, default_args = cfg["args"], cfg["default-args"]
@@ -92,7 +95,7 @@ def dict_formatfzf(_dict: dict):
   s = ''
   for k,v in _dict.items():
     s += ", {}: {}".format(k, v)
-  return s
+  return s[2:]
 
 
 def maplist(_list: list, func):
