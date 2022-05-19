@@ -88,7 +88,7 @@ def run_jobspoll(cmds: list[str], cwds: list[str], dictoptionslist: list[dict], 
         procs.pop(pidx)
     time.sleep(sleep)
 
-def loop_script(script: str, root: str="root", executable: str="python", options: str="", othercfgsfunc = None):
+def run_scriptover(script: str, root: str="root", executable: str="python", options: str="", othercfgsfunc = None):
   sub_dirs = get_subdirs(root)
   sub_cfgsfiles = append_basename(sub_dirs, "config.json")
   sub_cfgslist = maplist(sub_cfgsfiles, json_read)
