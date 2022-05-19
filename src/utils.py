@@ -14,6 +14,9 @@ def json_write(obj: Union[list, dict], json_filepath):
   with open(json_filepath, "wt") as fd:
     return json.dump(obj, fd, separators=(",", ":"))
 
+def json_writelist(dicts: list, cfg_filepaths):
+  for _dict, cfg_filepath in zip(dicts, cfg_filepaths):
+    return json_write(_dict, cfg_filepath)
 
 def randstr(length: int = 32):
   letters = string.ascii_letters + string.digits
@@ -55,6 +58,9 @@ def append_basename(sub_dirs: list[str], basename: str):
 
 def prepend_prefix(suffix_list: list[str], prefix: str):
   return ["{} {}".format(prefix, suffix) for suffix in suffix_list]
+
+def append_prefix(prefix_list: list[str], suffix: str):
+  return ["{} {}".format(prefix, suffix) for prefix in prefix_list]
 
 def prepend_dir(sub_dirs: list[str], dirname: str):
   return [os.path.join(dirname, sub_dir) for sub_dir in sub_dirs]
@@ -101,7 +107,23 @@ def dict_formatfzf(_dict: dict):
 def maplist(_list: list, func):
   return [func(item) for item in _list]
 
+def runlist(_list: list, func):
+  for item in _list:
+    func(item)
+
 
 def script2cmd(script: str, executable: str, options: str):
   script_abspath = os.path.join(os.getcwd(), script)
   return "{} {} {}".format(executable, script_abspath, options)
+
+
+def get_valdicts(dicts: list[dict], key: str):
+  return [_dict[key] for _dict in dicts]
+
+def set_keyvaldicts(dicts: list[dict], keys: list[str], values: list):
+  for i in range(len(dicts)):
+    dicts[i][keys[i]] = values[i]
+  return dicts
+
+def repeat(item, size: int):
+  return [item for _ in range(size)]
