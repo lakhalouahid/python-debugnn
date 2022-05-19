@@ -1,18 +1,21 @@
 import subprocess
 
 import time
-import pdb
+import sys
 import os
 
 from typing import Optional
 from utils import *
+from pyfzf import FzfPrompt
 
+
+fzf = FzfPrompt("/usr/bin/fzf")
 
 def prepare_training(config_filepath):
   cfg = json_read(config_filepath)
   rawoptionslist = gen_rawoptionslist(cfg)
   cmds_nmbr = len(rawoptionslist)
-  rootdir = "{}-{}".format(cfg["root"], int(time.time()))
+  rootdir = cfg["root"]
   cwds = randsubdirs(rootdir=rootdir, size=cmds_nmbr)
   for cwd in cwds:
     path = os.path.join(os.getcwd(), cwd)
@@ -85,3 +88,39 @@ def run_jobspoll(cmds: list[str], cwds: list[str], dictoptionslist: list[dict], 
         procs.pop(pidx)
     time.sleep(sleep)
 
+def loop_script(script: str, root: str="root", executable: str="python", options: str="", othercfgsfunc = None):
+  sub_dirs = get_subdirs(root)
+  sub_cfgsfiles = append_basename(sub_dirs, "config.json")
+  sub_cfgslist = maplist(sub_cfgsfiles, json_read)
+  sub_othercfgslist = othercfgsfunc(sub_dirs)
+  n, idx, proc = len(sub_dirs), 0, None
+  for i in range(n):
+    for k, v in sub_othercfgslist[i]:
+      sub_cfgslist[i][k] = v
+
+  sub_cfgsliststr = maplist(sub_cfgslist, dict_formatfzf)
+  while True:
+    uinput = input("Enter command (q/n/p/s/i/r): ")
+    if uinput == "q":
+      if proc != None:
+        proc.terminate()
+      break
+    elif uinput == "n":
+      idx += 1
+    elif uinput == "p":
+      idx -= 1
+    elif uinput == "r":
+      pass
+    elif uinput == "s":
+      selected_args_list = fzf.prompt(sub_cfgsliststr)
+      for selected_args in selected_args_list:
+        idx = sub_cfgsliststr.index(selected_args)
+    elif uinput == "i":
+      print(dict_pretty_print(sub_cfgslist[idx]))
+      continue
+    print(dict_pretty_print(sub_cfgslist[idx]))
+    if proc != None:
+      proc.terminate()
+    cmd = script2cmd(script, executable=executable, options=options)
+    proc = subprocess.Popen(cmd, cwd=sub_dirs[idx], stdin=sys.stdin, shell=True)
+    proc.wait()

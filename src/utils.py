@@ -86,3 +86,19 @@ def gen_rawoptionslist(cfg):
 
 def get_dictoptionslist(rawoptionslist: list[str]):
   return [rawparse_args(rawoptions) for rawoptions in rawoptionslist]
+
+
+def dict_formatfzf(_dict: dict):
+  s = ''
+  for k,v in _dict.items():
+    s += ", {}: {}".format(k, v)
+  return s
+
+
+def maplist(_list: list, func):
+  return [func(item) for item in _list]
+
+
+def script2cmd(script: str, executable: str, options: str):
+  script_abspath = os.path.join(os.getcwd(), script)
+  return "{} {} {}".format(executable, script_abspath, options)
