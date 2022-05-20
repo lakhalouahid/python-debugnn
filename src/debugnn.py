@@ -1,5 +1,6 @@
 import subprocess
 
+import shutil
 import time
 import sys
 import os
@@ -46,42 +47,44 @@ def train_jobspoll(config_path: str="debugnn_config.json", executable: str="pyth
     time.sleep(1)
 
 def run_jobspoll(cmds: list[str], cwds: list[str], dictoptionslist: list[dict], num_workers: int=4, sleep: float=1, test: bool=False, cfg_filename: str="config.json", **args):
-  stdinfds, stdoutfds, stderrfds = [], [], []
+  stdinfds, stdoutfds, stderrfds, _cwds = [], [], [], []
   procs, exe_cmds,ncmd = [], 0, len(cwds)
   cfg_filepaths = append_basename(cwds, cfg_filename)
   dictoptionslist = set_keyvaldicts(dictoptionslist, repeat("cmd", ncmd), cmds)
   dictoptionslist = set_keyvaldicts(dictoptionslist, repeat("train-started", ncmd), repeat(False, ncmd))
   dictoptionslist = set_keyvaldicts(dictoptionslist, repeat("train-ended", ncmd), repeat(False, ncmd))
+  dictoptionslist = set_keyvaldicts(dictoptionslist, repeat("returncode", ncmd), repeat(None, ncmd))
   json_writelist(dictoptionslist, cfg_filepaths)
   while exe_cmds < ncmd or len(procs) > 0:
     if len(procs) < num_workers and exe_cmds < len(cmds):
+      _cwds.append(cwds[exe_cmds])
       if not test:
-        stdoutfds.append(open(os.path.join(cwds[exe_cmds], "stdout"), "x"))
-        stderrfds.append(open(os.path.join(cwds[exe_cmds], "stderr"), "x"))
-        stdinfds.append(open(os.path.join(cwds[exe_cmds], "stdin"), "x+"))
-        json_cfg_filename = os.path.join(cwds[exe_cmds], cfg_filename)
-        cfg_dict = dictoptionslist[exe_cmds]
-        cfg_dict["train-started"] = True
-        json_write(cfg_dict, json_cfg_filename)
+        stdoutfds.append(open(os.path.join(_cwds[-1], "stdout"), "x"))
+        stderrfds.append(open(os.path.join(_cwds[-1], "stderr"), "x"))
+        stdinfds.append(open(os.path.join(_cwds[-1], "stdin"), "x+"))
+        json_cfg_filename = os.path.join(_cwds[-1], cfg_filename)
+        dictoptionslist[exe_cmds]["train-started"] = True
+        json_write(dictoptionslist[exe_cmds], json_cfg_filename)
         proc = subprocess.Popen(
             cmds[exe_cmds],
-            cwd=cwds[exe_cmds],
+            cwd=_cwds[-1],
             stdin=stdinfds[-1],
             stdout=stdoutfds[-1],
             stderr=stderrfds[-1],
             shell=True)
       else:
-        print(cmds[exe_cmds],cwds[exe_cmds])
         proc = subprocess.Popen(
             cmds[exe_cmds],
-            cwd=cwds[exe_cmds],
-            stdout=subprocess.DEVNULL,
+            cwd=_cwds[-1],
+            stdout=sys.stdout,
+            stderr=sys.stderr,
             shell=True)
       yield proc
       procs.append(proc)
       exe_cmds += 1
     for proc in procs:
       if proc.poll() != None:
+        proc.wait()
         pidx = procs.index(proc)
         if not test:
           stdoutfds[pidx].close()
@@ -90,16 +93,16 @@ def run_jobspoll(cmds: list[str], cwds: list[str], dictoptionslist: list[dict], 
           stdoutfds.pop(pidx)
           stderrfds.pop(pidx)
           stdinfds.pop(pidx)
-        else:
-          proc.wait()
-        procs.pop(pidx)
-        cfg_path = os.path.join(cwds[pidx], "config.json")
+        cfg_path = os.path.join(_cwds[pidx], "config.json")
         cfg_dict = json_read(cfg_path)
         cfg_dict["train-ended"] = True
+        cfg_dict["returncode"] = proc.returncode
         json_write(cfg_dict, cfg_path)
+        procs.pop(pidx)
+        _cwds.pop(pidx)
     time.sleep(sleep)
-  if test:
-    runlist(cwds, os.rmdir)
+  if test == True:
+    runlist(cwds, shutil.rmtree)
 
 def run_scriptover(script: str, root: str="root", executable: str="python", options: str="", othercfgsfunc = None):
   sub_dirs = get_subdirs(root)
@@ -138,6 +141,24 @@ def run_scriptover(script: str, root: str="root", executable: str="python", opti
     proc = subprocess.Popen(cmd, cwd=sub_dirs[idx], stdin=sys.stdin, shell=True)
     proc.wait()
 
+
+def resume_jobspoll(root: str, num_workers: int, **args):
+  poll = resume_training(root=root, num_workers=num_workers, **args)
+
+  procs = []
+  for proc in poll:
+    procs.append(proc)
+
+  while True:
+    all_terminated = True
+    for i in range(len(procs)):
+      if procs[i].poll() == None:
+        all_terminated = False
+
+    if all_terminated:
+      break
+    time.sleep(1)
+
 def resume_training(root: str, num_workers: int, cfg_filename: str = "config.json", resume_option: str = "--resume", sleep: float = 1):
   cwds = get_subdirs(root)
   cfg_filepaths = append_basename(cwds, "config.json")
@@ -145,26 +166,13 @@ def resume_training(root: str, num_workers: int, cfg_filename: str = "config.jso
   cmds = get_valdicts(dictoptionslist, "cmd")
   stdinfds, stdoutfds, stderrfds = [], [], []
   procs, _cwds, exe_cmds, skip_cmds = [], [], 0, 0
-  while exe_cmds < len(cmds) or len(procs) > 0:
-    json_cfg_filename = os.path.join(cwds[exe_cmds + skip_cmds], cfg_filename)
-    cfg_dict = dictoptionslist[exe_cmds + skip_cmds]
-    if not cfg_dict["train-ended"]:
-      if len(procs) < num_workers and exe_cmds < (len(cmds) - skip_cmds):
-        _cwds.append(cwds[exe_cmds + skip_cmds])
-        if not cfg_dict["train-started"]:
-          stdoutfds.append(open(os.path.join(_cwds[-1], "stdout"), "x"))
-          stderrfds.append(open(os.path.join(_cwds[-1], "stderr"), "x"))
-          stdinfds.append(open(os.path.join(_cwds[-1], "stdin"), "x+"))
-          cfg_dict["train-started"] = True
-          json_write(cfg_dict, json_cfg_filename)
-          proc = subprocess.Popen(
-              cmds[exe_cmds + skip_cmds],
-              cwd=_cwds[-1],
-              stdin=stdinfds[-1],
-              stdout=stdoutfds[-1],
-              stderr=stderrfds[-1],
-              shell=True)
-        else:
+  while exe_cmds < (len(cmds)  - skip_cmds) or len(procs) > 0:
+    if len(procs) < num_workers and exe_cmds < (len(cmds) - skip_cmds):
+      json_cfg_filename = os.path.join(cwds[exe_cmds + skip_cmds], cfg_filename)
+      cfg_dict = dictoptionslist[exe_cmds + skip_cmds]
+      _cwds.append(cwds[exe_cmds + skip_cmds])
+      if cfg_dict["train-started"]:
+        if not cfg_dict["train-ended"]:
           stdoutfds.append(open(os.path.join(_cwds[-1], "stdout"), "a"))
           stderrfds.append(open(os.path.join(_cwds[-1], "stderr"), "a"))
           stdinfds.append(open(os.path.join(_cwds[-1], "stdin"), "r"))
@@ -176,23 +184,42 @@ def resume_training(root: str, num_workers: int, cfg_filename: str = "config.jso
               stdout=stdoutfds[-1],
               stderr=stderrfds[-1],
               shell=True)
+          yield proc
+          procs.append(proc)
+          exe_cmds += 1
+        else:
+          skip_cmds += 1
+      else:
+        stdoutfds.append(open(os.path.join(_cwds[-1], "stdout"), "x"))
+        stderrfds.append(open(os.path.join(_cwds[-1], "stderr"), "x"))
+        stdinfds.append(open(os.path.join(_cwds[-1], "stdin"), "x+"))
+        cfg_dict["train-started"] = True
+        json_write(cfg_dict, json_cfg_filename)
+        proc = subprocess.Popen(
+            cmds[exe_cmds + skip_cmds],
+            cwd=_cwds[-1],
+            stdin=stdinfds[-1],
+            stdout=stdoutfds[-1],
+            stderr=stderrfds[-1],
+            shell=True)
         yield proc
         procs.append(proc)
         exe_cmds += 1
-      for proc in procs:
-        if proc.poll() != None:
-          pidx = procs.index(proc)
-          stdoutfds[pidx].close()
-          stderrfds[pidx].close()
-          stdinfds[pidx].close()
-          stdoutfds.pop(pidx)
-          stderrfds.pop(pidx)
-          stdinfds.pop(pidx)
-          procs.pop(pidx)
-          cfg_path = os.path.join(_cwds[pidx], "config.json")
-          cfg_dict = json_read(cfg_path)
-          cfg_dict["train-ended"] = True
-          json_write(cfg_dict, cfg_path)
-      time.sleep(sleep)
-    else:
-      skip_cmds += 1
+    for proc in procs:
+      if proc.poll() != None:
+        proc.wait()
+        pidx = procs.index(proc)
+        stdoutfds[pidx].close()
+        stderrfds[pidx].close()
+        stdinfds[pidx].close()
+        stdoutfds.pop(pidx)
+        stderrfds.pop(pidx)
+        stdinfds.pop(pidx)
+        cfg_path = os.path.join(_cwds[pidx], "config.json")
+        cfg_dict = json_read(cfg_path)
+        cfg_dict["train-ended"] = True
+        cfg_dict["returncode"] = proc.returncode
+        json_write(cfg_dict, cfg_path)
+        procs.pop(pidx)
+        _cwds.pop(pidx)
+    time.sleep(sleep)

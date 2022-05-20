@@ -6,17 +6,19 @@ import random
 from typing import Union
 
 def json_read(json_filepath):
-  with open(json_filepath, "rt") as fd:
+  with open(json_filepath, "r") as fd:
+    fd.seek(0)
     return json.load(fd)
 
 
 def json_write(obj: Union[list, dict], json_filepath):
-  with open(json_filepath, "wt") as fd:
+  with open(json_filepath, "w") as fd:
+    fd.seek(0)
     return json.dump(obj, fd, separators=(",", ":"))
 
 def json_writelist(dicts: list, cfg_filepaths):
   for _dict, cfg_filepath in zip(dicts, cfg_filepaths):
-    return json_write(_dict, cfg_filepath)
+    json_write(_dict, cfg_filepath)
 
 def randstr(length: int = 32):
   letters = string.ascii_letters + string.digits
@@ -67,6 +69,9 @@ def prepend_dir(sub_dirs: list[str], dirname: str):
 
 def get_subdirs(root: str):
   return prepend_dir(os.listdir(root), root)
+
+def get_files(root: str):
+  return get_subdirs(root)
 
 def gen_rawoptionslist(cfg):
   args, default_args = cfg["args"], cfg["default-args"]
@@ -127,3 +132,8 @@ def set_keyvaldicts(dicts: list[dict], keys: list[str], values: list):
 
 def repeat(item, size: int):
   return [item for _ in range(size)]
+
+
+def get_latesfile(dirpath):
+  return max(get_files(dirpath), key = os.path.getctime)
+
