@@ -104,7 +104,7 @@ def run_jobspoll(cmds: list[str], cwds: list[str], dictoptionslist: list[dict], 
   if test == True:
     runlist(cwds, shutil.rmtree)
 
-def run_scriptover(script: str, root: str="root", executable: str="python", options: str="", othercfgsfunc = None, filterfunc = None):
+def run_scriptover(script: str, root: str="root", executable: str="python", options: str="", othercfgsfunc = None, filterfunc = None, filterfields = []):
   sub_dirs = get_subdirs(root)
   sub_dirs = filterfunc(sub_dirs)
   sub_cfgsfiles = append_basename(sub_dirs, "config.json")
@@ -114,7 +114,8 @@ def run_scriptover(script: str, root: str="root", executable: str="python", opti
   for i in range(n):
     for k, v in sub_othercfgslist[i].items():
       sub_cfgslist[i][k] = v
-
+  def dict_formatfzf2(_dict):
+    return dict_formatfzf(_dict, filterfields)
   sub_cfgsliststr = maplist(sub_cfgslist, dict_formatfzf)
   while True:
     uinput = input("Enter command (q/n/p/s/i/r): ")

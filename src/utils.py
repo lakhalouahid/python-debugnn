@@ -102,10 +102,11 @@ def get_dictoptionslist(rawoptionslist: list[str]):
   return [rawparse_args(rawoptions) for rawoptions in rawoptionslist]
 
 
-def dict_formatfzf(_dict: dict):
+def dict_formatfzf(_dict: dict, filterfields: list[str] = []):
   s = ''
   for k,v in _dict.items():
-    s += ", {}: {}".format(k, v)
+    if not k in filterfields:
+      s += ", {}: {}".format(k, v)
   return s[2:]
 
 
