@@ -104,8 +104,9 @@ def run_jobspoll(cmds: list[str], cwds: list[str], dictoptionslist: list[dict], 
   if test == True:
     runlist(cwds, shutil.rmtree)
 
-def run_scriptover(script: str, root: str="root", executable: str="python", options: str="", othercfgsfunc = None):
+def run_scriptover(script: str, root: str="root", executable: str="python", options: str="", othercfgsfunc = None, filterfunc = None):
   sub_dirs = get_subdirs(root)
+  sub_dirs = filterfunc(sub_dirs)
   sub_cfgsfiles = append_basename(sub_dirs, "config.json")
   sub_cfgslist = maplist(sub_cfgsfiles, json_read)
   sub_othercfgslist = othercfgsfunc(sub_dirs)
