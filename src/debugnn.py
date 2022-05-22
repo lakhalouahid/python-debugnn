@@ -116,7 +116,7 @@ def run_scriptover(script: str, root: str="root", executable: str="python", opti
       sub_cfgslist[i][k] = v
   def dict_formatfzf2(_dict):
     return dict_formatfzf(_dict, filterfields)
-  sub_cfgsliststr = maplist(sub_cfgslist, dict_formatfzf)
+  sub_cfgsliststr = maplist(sub_cfgslist, dict_formatfzf2)
   while True:
     uinput = input("Enter command (q/n/p/s/i/r): ")
     if uinput == "q":
