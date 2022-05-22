@@ -109,12 +109,12 @@ def run_scriptover(script: str, root: str="root", executable: str="python", opti
   sub_dirs = filterfunc(sub_dirs)
   sub_cfgsfiles = append_basename(sub_dirs, "config.json")
   sub_cfgslist = maplist(sub_cfgsfiles, json_read)
-  if othercfgsfunc != None:
-    sub_cfgslist = othercfgsfunc(sub_dirs)
   n, idx, proc = len(sub_dirs), 0, None
-  for i in range(n):
-    for k, v in sub_cfgslist[i].items():
-      sub_cfgslist[i][k] = v
+  if othercfgsfunc != None:
+    sub_othercfgslist = othercfgsfunc(sub_dirs)
+    for i in range(n):
+      for k, v in sub_othercfgslist[i].items():
+        sub_cfgslist[i][k] = v
   def dict_formatfzf2(_dict):
     return dict_formatfzf(_dict, filterfields)
   sub_cfgsliststr = maplist(sub_cfgslist, dict_formatfzf2)
