@@ -69,7 +69,7 @@ def prepend_dir(sub_dirs: list[str], dirname: str):
 
 def get_subdirs(root: str):
   sub_dirs = os.listdir(root)
-  sub_dirs.sort(key=lambda x: os.stat(os.path.join(root, x)).st_ctime)
+  sub_dirs.sort(key=lambda x: os.stat(os.path.join(root, x)).st_ctime, reverse=True)
   return prepend_dir(sub_dirs, root)
 
 def get_files(root: str):
