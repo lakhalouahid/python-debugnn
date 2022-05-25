@@ -17,7 +17,13 @@ def prepare_training(config_filepath):
   rawoptionslist = gen_rawoptionslist(cfg)
   cmds_nmbr = len(rawoptionslist)
   rootdir = cfg["root"]
-  cwds = randsubdirs(rootdir=rootdir, size=cmds_nmbr)
+  cwds = makesubdirs(rootdir=rootdir, size=cmds_nmbr)
+  if not os.path.exists(rootdir):
+    os.makedirs(rootdir)
+  cfg['rawoptions'] = rawoptionslist
+  cfg['cwds'] = cwds
+  json_write(cfg, os.path.join(rootdir, "debugnn_config.json"))
+  shutil.copyfile(cfg['filename'], os.path.join(rootdir, cfg['filename']))
   for cwd in cwds:
     path = os.path.join(os.getcwd(), cwd)
     if not os.path.exists(path):
@@ -162,11 +168,23 @@ def resume_jobspoll(root: str, num_workers: int, **args):
       break
     time.sleep(1)
 
-def resume_training(root: str, num_workers: int, cfg_filename: str = "config.json", resume_option: str = "--resume", sleep: float = 1):
+def resume_training(root: str, num_workers: int, cfg_filename: str = "config.json", resume_option: str = "--resume", sleep: float = 1, extra_options: dict = {}, start_again: bool = False):
   cwds = get_subdirs(root)
   cfg_filepaths = append_basename(cwds, "config.json")
   dictoptionslist = maplist(cfg_filepaths, json_read)
   cmds = get_valdicts(dictoptionslist, "cmd")
+  rawoptions = []
+  for cmd in cmds:
+    rawoptions.append(cmd[cmd.index("--"):])
+  dictcmds = maplist(rawoptions, rawparse_args)
+  for i in range(len(dictcmds)):
+    for k, v in extra_options.items():
+      dictcmds[i][k] = v
+  rawoptions = gen_rawoptionslist_from_dicts(dictcmds)
+  cmds_ = []
+  for i in range(len(cmds)):
+    cmds_.append("{}{}".format(cmds[i][:cmds[i].index("--")], rawoptions[i]))
+  cmds = cmds_
   stdinfds, stdoutfds, stderrfds = [], [], []
   procs, _cwds, exe_cmds, skip_cmds = [], [], 0, 0
   while exe_cmds < (len(cmds)  - skip_cmds) or len(procs) > 0:
@@ -175,11 +193,12 @@ def resume_training(root: str, num_workers: int, cfg_filename: str = "config.jso
       cfg_dict = dictoptionslist[exe_cmds + skip_cmds]
       _cwds.append(cwds[exe_cmds + skip_cmds])
       if cfg_dict["train-started"]:
-        if not cfg_dict["train-ended"]:
+        if start_again or (not cfg_dict["train-ended"]):
           stdoutfds.append(open(os.path.join(_cwds[-1], "stdout"), "a"))
           stderrfds.append(open(os.path.join(_cwds[-1], "stderr"), "a"))
           stdinfds.append(open(os.path.join(_cwds[-1], "stdin"), "r"))
           _cmd = "{} {}".format(cmds[exe_cmds + skip_cmds], resume_option)
+          print(_cmd)
           proc = subprocess.Popen(
               _cmd,
               cwd=_cwds[-1],
