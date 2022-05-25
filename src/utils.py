@@ -1,8 +1,11 @@
+from genericpath import isdir
+from posixpath import join
 import re
 import os
 import json
 import string
 import random
+from sys import argv, excepthook
 from typing import Union
 
 def json_read(json_filepath):
@@ -28,6 +31,19 @@ def randsubdirs(size: int, rootdir="data", length: int = 10):
   cwds = [os.path.join(rootdir, randstr(length)) for _ in range(size)]
   return cwds
 
+def makesubdirs(size: int, rootdir="data"):
+  try:
+    subdirs = [int(folder) for folder in os.listdir(rootdir)  if os.path.isdir(os.path.join(rootdir, folder))]
+    subdirs.sort(reverse=True)
+    if len(subdirs) > 0:
+      base = 1 + subdirs[0]
+    else:
+      base = 1
+  except  FileNotFoundError:
+    base = 1
+  cwds = [os.path.join(rootdir, str(i)) for i in range(base, base + size)]
+  return cwds
+
 
 def rawparse_args(rawoptions: str):
   matches = re.findall(r'(?:--?)([\w-]+)(.*?)(?= -|$)', rawoptions)
@@ -48,18 +64,31 @@ def read_lastline(filepath):
     try:
       f.seek(-2, os.SEEK_END)
       while f.read(1) != b'\n':
-        f.seek(-2, os.SEEK_CUR)
+       f.seek(-2, os.SEEK_CUR)
     except OSError:
       f.seek(0)
     last_line = f.readline().decode()
   return last_line
 
+def gen_rawoptionslist_from_dicts(dictcmds):
+  rawoptionslist = []
+  for i in range(len(dictcmds)):
+    cmd = ""
+    for argname, argval in dictcmds[i].items():
+      options = " --{} {}".format(argname, argval)
+      if type(argval) == bool:
+        if argval == True:
+          options = " --{}".format(argname)
+        else:
+          options == ""
+      cmd += options
+    rawoptionslist.append(cmd)
+
+  return rawoptionslist
 
 def append_basename(sub_dirs: list[str], basename: str):
   return [os.path.join(sub_dir, basename) for sub_dir in sub_dirs]
-
-def prepend_prefix(suffix_list: list[str], prefix: str):
-  return ["{} {}".format(prefix, suffix) for suffix in suffix_list]
+def prepend_prefix(suffix_list: list[str], prefix: str): return ["{} {}".format(prefix, suffix) for suffix in suffix_list]
 
 def append_prefix(prefix_list: list[str], suffix: str):
   return ["{} {}".format(prefix, suffix) for prefix in prefix_list]
@@ -68,7 +97,7 @@ def prepend_dir(sub_dirs: list[str], dirname: str):
   return [os.path.join(dirname, sub_dir) for sub_dir in sub_dirs]
 
 def get_subdirs(root: str):
-  sub_dirs = os.listdir(root)
+  sub_dirs = [subdir for subdir in os.listdir(root) if os.path.isdir(os.path.join(root, subdir))]
   sub_dirs.sort(key=lambda x: os.stat(os.path.join(root, x)).st_ctime, reverse=True)
   return prepend_dir(sub_dirs, root)
 
