@@ -116,8 +116,11 @@ def gen_rawoptionslist(cfg):
       argtype = arg["type"]
 
       options = " --{} {}".format(argname, argval)
-      if argtype == "bool" and argval:
-        options = " --{}".format(args[i]['name'])
+      if argtype == "bool":
+        if argval:
+          options = " --{}".format(args[i]['name'])
+        else:
+          options = ""
       cmd += options
     rawoptionslist.append(cmd)
 

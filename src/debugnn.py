@@ -21,6 +21,7 @@ def prepare_training(config_filepath):
   if not os.path.exists(rootdir):
     os.makedirs(rootdir)
   cfg['rawoptions'] = rawoptionslist
+  print(rawoptionslist)
   cfg['cwds'] = cwds
   json_write(cfg, os.path.join(rootdir, "debugnn_config.json"))
   shutil.copyfile(cfg['filename'], os.path.join(rootdir, cfg['filename']))
@@ -216,6 +217,8 @@ def resume_training(root: str, num_workers: int, cfg_filename: str = "config.jso
         stderrfds.append(open(os.path.join(_cwds[-1], "stderr"), "x"))
         stdinfds.append(open(os.path.join(_cwds[-1], "stdin"), "x+"))
         cfg_dict["train-started"] = True
+        cfg_dict["train-ended"] = False
+        cfg_dict["returncode"] = None
         json_write(cfg_dict, json_cfg_filename)
         proc = subprocess.Popen(
             cmds[exe_cmds + skip_cmds],
