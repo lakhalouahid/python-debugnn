@@ -15,6 +15,12 @@ fzf = FzfPrompt("/usr/bin/fzf")
 def prepare_training(config_filepath):
   cfg = json_read(config_filepath)
   rawoptionslist = gen_rawoptionslist(cfg)
+  if cfg.get("repeat"):
+    _rawoptionslist = []
+    for i in range(len(rawoptionslist)):
+      for _ in range(cfg.get("repeat")):
+        _rawoptionslist.append(rawoptionslist[i])
+    rawoptionslist = _rawoptionslist
   cmds_nmbr = len(rawoptionslist)
   rootdir = cfg["root"]
   cwds = makesubdirs(rootdir=rootdir, size=cmds_nmbr)
