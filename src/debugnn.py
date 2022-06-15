@@ -159,8 +159,8 @@ def run_scriptover(script: str, root: str="root", executable: str="python", opti
     proc = subprocess.Popen(cmd, cwd=sub_dirs[idx], stdin=sys.stdin, shell=True)
     proc.wait()
 
-def headless_run_scriptover(script: str, root: str="root", executable: str="python", options: str="", othercfgsfunc = None, filterfunc = None):
-  sub_dirs = get_subdirs(root)
+def headless_run_scriptover(script: str, root: str="root", executable: str="python", options: str="", othercfgsfunc = None, filterfunc = None, exclude_folders=[]):
+  sub_dirs = get_subdirs(root, exclude_folders=exclude_folders)
   sub_dirs = filterfunc(sub_dirs)
   sub_cfgsfiles = append_basename(sub_dirs, "config.json")
   sub_cfgslist = maplist(sub_cfgsfiles, json_read)
