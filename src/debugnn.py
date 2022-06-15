@@ -117,8 +117,8 @@ def run_jobspoll(cmds: list[str], cwds: list[str], dictoptionslist: list[dict], 
   if test == True:
     runlist(cwds, shutil.rmtree)
 
-def run_scriptover(script: str, root: str="root", executable: str="python", options: str="", othercfgsfunc = None, filterfunc = None, filterfields = []):
-  sub_dirs = get_subdirs(root)
+def run_scriptover(script: str, root: str="root", executable: str="python", options: str="", othercfgsfunc = None, filterfunc = None, filterfields = [], exclude_folders = []):
+  sub_dirs = get_subdirs(root, exclude_folders=exclude_folders)
   sub_dirs = filterfunc(sub_dirs)
   sub_cfgsfiles = append_basename(sub_dirs, "config.json")
   sub_cfgslist = maplist(sub_cfgsfiles, json_read)
@@ -148,15 +148,35 @@ def run_scriptover(script: str, root: str="root", executable: str="python", opti
       for selected_args in selected_args_list:
         idx = sub_cfgsliststr.index(selected_args)
     elif uinput == "i":
-      print(dict_pretty_print(sub_cfgslist[idx]))
-      continue
+      idx = int(input("select index: "))
     print(dict_pretty_print(sub_cfgslist[idx]))
     if proc != None:
       proc.terminate()
+    if not script:
+      sub_dirs = get_subdirs(root)
     cmd = script2cmd(script, executable=executable, options=options)
+    print(sub_dirs[idx])
     proc = subprocess.Popen(cmd, cwd=sub_dirs[idx], stdin=sys.stdin, shell=True)
     proc.wait()
 
+def headless_run_scriptover(script: str, root: str="root", executable: str="python", options: str="", othercfgsfunc = None, filterfunc = None):
+  sub_dirs = get_subdirs(root)
+  sub_dirs = filterfunc(sub_dirs)
+  sub_cfgsfiles = append_basename(sub_dirs, "config.json")
+  sub_cfgslist = maplist(sub_cfgsfiles, json_read)
+  n, idx, proc = len(sub_dirs), 0, None
+
+  if othercfgsfunc != None:
+    sub_othercfgslist = othercfgsfunc(sub_dirs)
+    for i in range(n):
+      for k, v in sub_othercfgslist[i].items():
+        sub_cfgslist[i][k] = v
+
+  for idx in range(len(sub_dirs)):
+    print(dict_pretty_print(sub_cfgslist[idx]))
+    cmd = script2cmd(script, executable=executable, options=options)
+    proc = subprocess.Popen(cmd, cwd=sub_dirs[idx], stdin=sys.stdin, shell=True)
+    proc.wait()
 
 def resume_jobspoll(root: str, num_workers: int, **args):
   poll = resume_training(root=root, num_workers=num_workers, **args)

@@ -96,8 +96,8 @@ def append_prefix(prefix_list: list[str], suffix: str):
 def prepend_dir(sub_dirs: list[str], dirname: str):
   return [os.path.join(dirname, sub_dir) for sub_dir in sub_dirs]
 
-def get_subdirs(root: str):
-  sub_dirs = [subdir for subdir in os.listdir(root) if os.path.isdir(os.path.join(root, subdir))]
+def get_subdirs(root: str, exclude_folders = []):
+  sub_dirs = [subdir for subdir in os.listdir(root) if os.path.isdir(os.path.join(root, subdir)) and (not subdir in exclude_folders)]
   sub_dirs.sort(key=lambda x: os.stat(os.path.join(root, x)).st_ctime, reverse=True)
   return prepend_dir(sub_dirs, root)
 
