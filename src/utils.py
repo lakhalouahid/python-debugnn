@@ -1,11 +1,8 @@
-from genericpath import isdir
-from posixpath import join
 import re
 import os
 import json
 import string
 import random
-from sys import argv, excepthook
 from typing import Union
 
 def json_read(json_filepath):
@@ -33,10 +30,16 @@ def randsubdirs(size: int, rootdir="data", length: int = 10):
 
 def makesubdirs(size: int, rootdir="data"):
   try:
-    subdirs = [int(folder) for folder in os.listdir(rootdir)  if os.path.isdir(os.path.join(rootdir, folder))]
-    subdirs.sort(reverse=True)
+    subdirs = [subdir for subdir in os.listdir(rootdir) if os.path.isdir(os.path.join(rootdir, subdir))]
+    train_subdirs = []
+    for subdir in subdirs:
+      try:
+        train_subdirs.append(int(subdir))
+      except:
+        pass
+    train_subdirs.sort(reverse=True)
     if len(subdirs) > 0:
-      base = 1 + subdirs[0]
+      base = 1 + train_subdirs[0]
     else:
       base = 1
   except  FileNotFoundError:
@@ -101,8 +104,6 @@ def get_subdirs(root: str, exclude_folders = []):
   sub_dirs.sort(key=lambda x: os.stat(os.path.join(root, x)).st_ctime, reverse=True)
   return prepend_dir(sub_dirs, root)
 
-def get_files(root: str):
-  return get_subdirs(root)
 
 def gen_rawoptionslist(cfg):
   args, default_args = cfg["args"], cfg["default-args"]

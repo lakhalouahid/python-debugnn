@@ -152,10 +152,14 @@ def run_scriptover(script: str, root: str="root", executable: str="python", opti
     print(dict_pretty_print(sub_cfgslist[idx]))
     if proc != None:
       proc.terminate()
-    if not script:
-      sub_dirs = get_subdirs(root)
+    if script == None:
+      files = [file for file in os.listdir(root) if os.path.isfile(file)]
+      for file in files:
+        if file.rfind(".py") >= 0:
+          script = os.path.join(root, file)
+          break
     cmd = script2cmd(script, executable=executable, options=options)
-    print(sub_dirs[idx])
+    print(cmd)
     proc = subprocess.Popen(cmd, cwd=sub_dirs[idx], stdin=sys.stdin, shell=True)
     proc.wait()
 
@@ -172,9 +176,16 @@ def headless_run_scriptover(script: str, root: str="root", executable: str="pyth
       for k, v in sub_othercfgslist[i].items():
         sub_cfgslist[i][k] = v
 
+  if not script:
+    files = [file for file in os.listdir(root) if os.path.isfile(file)]
+    for file in files:
+      if file.rfind(".py") == (len(file) - 1):
+        script = os.path.join(root, file)
+        break
   for idx in range(len(sub_dirs)):
     print(dict_pretty_print(sub_cfgslist[idx]))
     cmd = script2cmd(script, executable=executable, options=options)
+    print(cmd)
     proc = subprocess.Popen(cmd, cwd=sub_dirs[idx], stdin=sys.stdin, shell=True)
     proc.wait()
 
