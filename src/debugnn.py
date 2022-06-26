@@ -5,12 +5,12 @@ import time
 import sys
 import os
 
-from typing import Optional
 from utils import *
 from pyfzf import FzfPrompt
 
 
 fzf = FzfPrompt("/usr/bin/fzf")
+fzf = os.
 
 def prepare_training(config_filepath):
   cfg = json_read(config_filepath)
@@ -23,11 +23,10 @@ def prepare_training(config_filepath):
     rawoptionslist = _rawoptionslist
   cmds_nmbr = len(rawoptionslist)
   rootdir = cfg["root"]
-  cwds = makesubdirs(rootdir=rootdir, size=cmds_nmbr)
+  cwds = makenumberedsubdirs(rootdir=rootdir, size=cmds_nmbr)
   if not os.path.exists(rootdir):
     os.makedirs(rootdir)
   cfg['rawoptions'] = rawoptionslist
-  print(rawoptionslist)
   cfg['cwds'] = cwds
   json_write(cfg, os.path.join(rootdir, "debugnn_config.json"))
   shutil.copyfile(cfg['filename'], os.path.join(rootdir, cfg['filename']))
@@ -128,9 +127,9 @@ def run_scriptover(script: str, root: str="root", executable: str="python", opti
     for i in range(n):
       for k, v in sub_othercfgslist[i].items():
         sub_cfgslist[i][k] = v
-  def dict_formatfzf2(_dict):
-    return dict_formatfzf(_dict, filterfields)
-  sub_cfgsliststr = maplist(sub_cfgslist, dict_formatfzf2)
+  def dict_formatfzf2(_dict, index):
+    return "{}: {}".format(index+1, dict_formatfzf(_dict, filterfields))
+  sub_cfgsliststr = maplistindex(sub_cfgslist, dict_formatfzf2)
   while True:
     uinput = input("Enter command (q/n/p/s/i/r): ")
     if uinput == "q":
@@ -159,7 +158,6 @@ def run_scriptover(script: str, root: str="root", executable: str="python", opti
           script = os.path.join(root, file)
           break
     cmd = script2cmd(script, executable=executable, options=options)
-    print(cmd)
     proc = subprocess.Popen(cmd, cwd=sub_dirs[idx], stdin=sys.stdin, shell=True)
     proc.wait()
 
@@ -185,7 +183,6 @@ def headless_run_scriptover(script: str, root: str="root", executable: str="pyth
   for idx in range(len(sub_dirs)):
     print(dict_pretty_print(sub_cfgslist[idx]))
     cmd = script2cmd(script, executable=executable, options=options)
-    print(cmd)
     proc = subprocess.Popen(cmd, cwd=sub_dirs[idx], stdin=sys.stdin, shell=True)
     proc.wait()
 
