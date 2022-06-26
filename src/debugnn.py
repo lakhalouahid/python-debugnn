@@ -10,7 +10,6 @@ from pyfzf import FzfPrompt
 
 
 fzf = FzfPrompt("/usr/bin/fzf")
-fzf = os.
 
 def prepare_training(config_filepath):
   cfg = json_read(config_filepath)
