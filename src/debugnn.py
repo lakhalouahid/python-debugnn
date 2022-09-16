@@ -33,6 +33,15 @@ def prepare_training(config_filepath):
     path = os.path.join(os.getcwd(), cwd)
     if not os.path.exists(path):
       os.makedirs(path)
+      for file2move in cfg['files2move']:
+        if not os.path.exists(os.path.join(path, os.path.dirname(file2move))):
+          os.makedirs(os.path.join(path, os.path.dirname(file2move)))
+        shutil.copyfile(file2move, os.path.join(path, file2move))
+      for dir2move in cfg['dirs2move']:
+        if not os.path.exists(os.path.join(path, os.path.dirname(dir2move))):
+          os.makedirs(os.path.join(path, os.path.dirname(dir2move)))
+        shutil.copytree(dir2move, os.path.join(path, dir2move))
+
   return (cfg, rawoptionslist, cwds)
 
 
@@ -70,8 +79,66 @@ def run_jobspoll(cmds: list[str], cwds: list[str], dictoptionslist: list[dict], 
     if len(procs) < num_workers and exe_cmds < len(cmds):
       _cwds.append(cwds[exe_cmds])
       if not test:
-        stdoutfds.append(open(os.path.join(_cwds[-1], "stdout"), "x"))
-        stderrfds.append(open(os.path.join(_cwds[-1], "stderr"), "x"))
+        stdoutfds.append(open(os.path.join(_cwds[-1], "stdout"), "w"))
+        stderrfds.append(open(os.path.join(_cwds[-1], "stderr"), "w"))
+        stdinfds.append(open(os.path.join(_cwds[-1], "stdin"), "x+"))
+        json_cfg_filename = os.path.join(_cwds[-1], cfg_filename)
+        dictoptionslist[exe_cmds]["train-started"] = True
+        json_write(dictoptionslist[exe_cmds], json_cfg_filename)
+        proc = subprocess.Popen(
+            cmds[exe_cmds],
+            cwd=_cwds[-1],
+            stdin=stdinfds[-1],
+            stdout=stdoutfds[-1],
+            stderr=stderrfds[-1],
+            shell=True)
+      else:
+        proc = subprocess.Popen(
+            cmds[exe_cmds],
+            cwd=_cwds[-1],
+            stdout=sys.stdout,
+            stderr=sys.stderr,
+            shell=True)
+      yield proc
+      procs.append(proc)
+      exe_cmds += 1
+    for proc in procs:
+      if proc.poll() != None:
+        proc.wait()
+        pidx = procs.index(proc)
+        if not test:
+          stdoutfds[pidx].close()
+          stderrfds[pidx].close()
+          stdinfds[pidx].close()
+          stdoutfds.pop(pidx)
+          stderrfds.pop(pidx)
+          stdinfds.pop(pidx)
+        cfg_path = os.path.join(_cwds[pidx], "config.json")
+        cfg_dict = json_read(cfg_path)
+        cfg_dict["train-ended"] = True
+        cfg_dict["returncode"] = proc.returncode
+        json_write(cfg_dict, cfg_path)
+        procs.pop(pidx)
+        _cwds.pop(pidx)
+    time.sleep(sleep)
+  if test == True:
+    runlist(cwds, shutil.rmtree)
+
+def run_jobspoll(cmds: list[str], cwds: list[str], dictoptionslist: list[dict], num_workers: int=4, sleep: float=1, test: bool=False, cfg_filename: str="config.json", **args):
+  stdinfds, stdoutfds, stderrfds, _cwds = [], [], [], []
+  procs, exe_cmds,ncmd = [], 0, len(cwds)
+  cfg_filepaths = append_basename(cwds, cfg_filename)
+  dictoptionslist = set_keyvaldicts(dictoptionslist, repeat("cmd", ncmd), cmds)
+  dictoptionslist = set_keyvaldicts(dictoptionslist, repeat("train-started", ncmd), repeat(False, ncmd))
+  dictoptionslist = set_keyvaldicts(dictoptionslist, repeat("train-ended", ncmd), repeat(False, ncmd))
+  dictoptionslist = set_keyvaldicts(dictoptionslist, repeat("returncode", ncmd), repeat(None, ncmd))
+  json_writelist(dictoptionslist, cfg_filepaths)
+  while exe_cmds < ncmd or len(procs) > 0:
+    if len(procs) < num_workers and exe_cmds < len(cmds):
+      _cwds.append(cwds[exe_cmds])
+      if not test:
+        stdoutfds.append(open(os.path.join(_cwds[-1], "stdout"), "w"))
+        stderrfds.append(open(os.path.join(_cwds[-1], "stderr"), "w"))
         stdinfds.append(open(os.path.join(_cwds[-1], "stdin"), "x+"))
         json_cfg_filename = os.path.join(_cwds[-1], cfg_filename)
         dictoptionslist[exe_cmds]["train-started"] = True
@@ -120,6 +187,7 @@ def run_scriptover(script: str, root: str="root", executable: str="python", opti
   sub_dirs = filterfunc(sub_dirs)
   sub_cfgsfiles = append_basename(sub_dirs, "config.json")
   sub_cfgslist = maplist(sub_cfgsfiles, json_read)
+  
   n, idx, proc = len(sub_dirs), 0, None
   if othercfgsfunc != None:
     sub_othercfgslist = othercfgsfunc(sub_dirs)
@@ -143,6 +211,8 @@ def run_scriptover(script: str, root: str="root", executable: str="python", opti
       pass
     elif uinput == "s":
       selected_args_list = fzf.prompt(sub_cfgsliststr)
+      if selected_args_list == None or selected_args_list == '':
+        return
       for selected_args in selected_args_list:
         idx = sub_cfgsliststr.index(selected_args)
     elif uinput == "i":
@@ -150,17 +220,19 @@ def run_scriptover(script: str, root: str="root", executable: str="python", opti
     print(dict_pretty_print(sub_cfgslist[idx]))
     if proc != None:
       proc.terminate()
+
     if script == None:
       files = [file for file in os.listdir(root) if os.path.isfile(file)]
       for file in files:
         if file.rfind(".py") >= 0:
           script = os.path.join(root, file)
           break
-    cmd = script2cmd(script, executable=executable, options=options)
+    raw_options = sub_cfgslist[idx]['cmd'][sub_cfgslist[idx]['cmd'].find('--'):]
+    cmd = script2cmd(script, executable=executable, options='{} {}'.format(raw_options, options))
     proc = subprocess.Popen(cmd, cwd=sub_dirs[idx], stdin=sys.stdin, shell=True)
     proc.wait()
 
-def headless_run_scriptover(script: str, root: str="root", executable: str="python", options: str="", othercfgsfunc = None, filterfunc = None, exclude_folders=[]):
+def headless_run_scriptover(script: str, root: str="root", executable: str="python", options: str="", othercfgsfunc = None, filterfunc = None, filterfields = [], exclude_folders = []):
   sub_dirs = get_subdirs(root, exclude_folders=exclude_folders)
   sub_dirs = filterfunc(sub_dirs)
   sub_cfgsfiles = append_basename(sub_dirs, "config.json")
@@ -173,15 +245,16 @@ def headless_run_scriptover(script: str, root: str="root", executable: str="pyth
       for k, v in sub_othercfgslist[i].items():
         sub_cfgslist[i][k] = v
 
-  if not script:
+  if script == None:
     files = [file for file in os.listdir(root) if os.path.isfile(file)]
     for file in files:
-      if file.rfind(".py") == (len(file) - 1):
+      if file.rfind(".py") >= 0:
         script = os.path.join(root, file)
         break
   for idx in range(len(sub_dirs)):
     print(dict_pretty_print(sub_cfgslist[idx]))
-    cmd = script2cmd(script, executable=executable, options=options)
+    raw_options = sub_cfgslist[idx]['cmd'][sub_cfgslist[idx]['cmd'].find('--'):]
+    cmd = script2cmd(script, executable=executable, options='{} {}'.format(raw_options, options))
     proc = subprocess.Popen(cmd, cwd=sub_dirs[idx], stdin=sys.stdin, shell=True)
     proc.wait()
 
@@ -230,7 +303,7 @@ def resume_training(root: str, num_workers: int, cfg_filename: str = "config.jso
         if start_again or (not cfg_dict["train-ended"]):
           stdoutfds.append(open(os.path.join(_cwds[-1], "stdout"), "a"))
           stderrfds.append(open(os.path.join(_cwds[-1], "stderr"), "a"))
-          stdinfds.append(open(os.path.join(_cwds[-1], "stdin"), "r"))
+          stdinfds.append(open(os.path.join(_cwds[-1], "stdin"), "x+"))
           _cmd = "{} {}".format(cmds[exe_cmds + skip_cmds], resume_option)
           print(_cmd)
           proc = subprocess.Popen(
